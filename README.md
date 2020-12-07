@@ -1,2 +1,1 @@
-# statgen
-Statistical Genetics Final Project
+# Statistical Genetics Final Project
