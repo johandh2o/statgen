@@ -8,9 +8,9 @@
 ## Load libraries
 ##################################################
 
-library(dplyr)
 library(genetics)
-library(MASS)
+library(tidyverse)
+
 library(randomForest)
 
 ##################################################
@@ -22,7 +22,7 @@ fullData = read.delim("http://www.biostat.umn.edu/~cavanr/FMS_data.txt",
                      header=T, sep="\t")
 
 # Genotype data
-genoData = fullData[,4:226] %>% select (-c(b2b, pai1_4g5g))
+genotypeData = fullData[,4:226] %>% select (-c(b2b, pai1_4g5g))
 
 # Cofounders
 
