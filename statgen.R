@@ -69,10 +69,11 @@ summary(lm(NDRM.CH ~ allele.count(genotype(resistin_c180g, sep=""))[,1]
 # Extract p value for every SNP
 k = ncol(genotypeData)
 pvalues = rep(NA, k)
+mod = list()
 for(i in 1:k){
-  mod = lm(NDRM.CH ~ allele.count(genotype(genotypeData[,i], sep=""))[,1] 
+  mod[[i]] = lm(NDRM.CH ~ allele.count(genotype(genotypeData[,i], sep=""))[,1] 
            + Age + Gender + pre.BMI, data=fullData)
-  pvalues[i] = summary(mod)$coefficients[2,4]  
+  pvalues[i] = summary(mod[[i]])$coefficients[2,4]  
 }
 
 # Manhattan Plot
@@ -81,7 +82,7 @@ abline(h = -log10(0.05))
 abline(h = -log10(1-(1-0.05)^(1/k)))
 
 # Which SNP are associated
-snpNaiv = which(pvalues <= 0.05, arr.ind=TRUE, useNames = FALSE)
+snpNaiv = which(pvalues <= 0.025, arr.ind=TRUE, useNames = FALSE)
 colnames(genotypeData)[snpNaiv]
 
 
@@ -114,7 +115,7 @@ summary(haplomodel)
 
 
 
-
+texreg(l = list(mod[[1]], mod[[139]], mod[[102]], mod[[210]]))
 
 
 # Other side analysis
