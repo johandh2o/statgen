@@ -10,6 +10,7 @@
 
 library(genetics)
 library(tidyverse)
+library(FactoMineR)
 library(qvalue)
 library(pegas)
 library(haplo.stats)
@@ -51,14 +52,24 @@ traits = fullData %>%
 ##################################################
 
 matData = data.matrix(genotypeData)
+missingness = apply(matData, 1, function(x) sum(is.na(x)))/ ncol(matData)
 matData[is.na(genotypeData)] = 0
 
 PCA = prcomp(matData)
+
+data.frame(PC1 = PCA$"x"[,1],
+           PC2 = PCA$"x"[,2],
+           Missingness = missingness) %>%
+  ggplot(aes(x=PC1, y=PC2, color=missingness)) +
+  geom_point() + theme_bw() + 
+  theme(legend.position="bottom", legend.box = "horizontal")
+
 data.frame(PC1 = PCA$"x"[,1],
            PC2 = PCA$"x"[,2],
            Race = traits$Race) %>%
   ggplot(aes(x=PC1, y=PC2, color=Race)) +
-  geom_point() + theme_bw()
+  geom_point() + theme_bw() + 
+  theme(legend.position="bottom", legend.box = "horizontal")
 
 ##################################################
 ## Genotypic association
