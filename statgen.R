@@ -113,6 +113,8 @@ colnames(genotypeData)[snpFDR]
 geno1 = genotypeData[,35:38]
 hw.test(df2genind(geno1, sep=''))
 
+genetics::LD(makeGenotypes(geno1, sep=''))
+
 # Haplotype regression
 geno1 = cbind.data.frame(
   substr(genotypeData$akt2_7254617,1,1), substr(genotypeData$akt2_7254617,2,2),
@@ -142,9 +144,10 @@ summary(haplomodel1r)
 ## Haplotypic association 2
 ##################################################
 
-# HW Equilibrium
+# HW Equilibrium and LD
 geno2 = genotypeData[,208:213]
 hw.test(df2genind(geno2, sep=''))
+genetics::LD(makeGenotypes(geno2, sep=''))
 
 # Haplotype regression
 geno2 = cbind.data.frame(
