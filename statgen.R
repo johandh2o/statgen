@@ -11,6 +11,7 @@
 library(genetics)
 library(tidyverse)
 library(FactoMineR)
+library(lattice)
 library(qvalue)
 library(pegas)
 library(haplo.stats)
@@ -35,6 +36,7 @@ fullData = read.delim("http://www.biostat.umn.edu/~cavanr/FMS_data.txt",
 
 # Binary race variable: Caucasian, non-Caucasian
 fullData$Caucasian = ifelse(fullData$Race=='Caucasian', 1, 0)
+fullData$resp = sqrt(fullData$NDRM.CH)
 
 # Genotype data
 genotypeData = fullData[,4:226] %>% 
@@ -90,6 +92,10 @@ plot(1:k, -log10(pvalues))
 abline(h = -log10(0.05))
 abline(h = -log10(1-(1-0.05)^(1/k))) # Pvalue correction 
 
+qqmath(~-log10(pvalues),
+       distribution=function(x){-log10(qunif(1-x))},
+       xlab = '=-log10(expected pvalues)')
+
 # Which SNP are associated using pvalue 0.05
 snpNaiv = which(pvalues <= 0.05, arr.ind=TRUE, useNames = FALSE)
 colnames(genotypeData)[snpNaiv]
@@ -101,8 +107,8 @@ min(qobj$pi0.lambda)
 min(qobj$pi0.smooth)
 
 # False discovery rate estimation
-max(qobj$qvalues[qobj$pvalues <= 0.006])
-snpFDR = which(pvalues <= 0.006, arr.ind=TRUE, useNames = FALSE)
+max(qobj$qvalues[qobj$pvalues <= 0.001])
+snpFDR = which(pvalues <= 0.001, arr.ind=TRUE, useNames = FALSE)
 colnames(genotypeData)[snpFDR]
 
 ##################################################
@@ -112,7 +118,6 @@ colnames(genotypeData)[snpFDR]
 # HW Equilibrium
 geno1 = genotypeData[,35:38]
 hw.test(df2genind(geno1, sep=''))
-
 genetics::LD(makeGenotypes(geno1, sep=''))
 
 # Haplotype regression
