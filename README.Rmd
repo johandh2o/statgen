@@ -48,12 +48,11 @@ genotypeData = fullData[,4:226] %>%
                     gdf8_1225t, gdf8_p198a, gdf8_e164k))
 
 # Traits and cofounders
-fullData$respLog = log(1+fullData$NDRM.CH)
-fullData$respAsh = asinh(fullData$NDRM.CH)
+fullData$respLog = log(1+fullData$NDRM.CH/100)
 
 traits = fullData %>% 
   dplyr::select(Gender, Age, Race, Caucasian, pre.BMI,
-                NDRM.CH, respLog, respAsh)
+                NDRM.CH, respLog)
 ```
 
 
@@ -84,3 +83,94 @@ data.frame(PC1 = PCA$"x"[,1],
   geom_point() + theme_bw() + 
   theme(legend.position="bottom", legend.box = "horizontal")
 ```
+
+Subpopulation structure is partially explained by race. Missing genetic information makes data appear heterogeneous.
+
+## Single-SNP association tests
+```{r}
+# Extract p value for ANOVA test contrasting:
+# M1: Linear regression respLog ~ genotype + covariates
+# M0: Linear regression respLog ~ covariates
+k = ncol(genotypeData)
+pvalues = rep(NA, k)
+for(i in 1:k){
+  # Model 1
+  tryCatch( { m1 = lm(respLog ~ genotypeData[,i]+ Caucasian + Age + Gender + pre.BMI,
+                      data=fullData) },
+            error = function(e) {m1 = lm(respLog ~ genotypeData[,i] + Age + Gender + pre.BMI,
+                                         data=fullData)})
+  # Model 0
+  m0 = updated(m1, .~.-genotypeData[,i])
+  # p-values from ANOVA test
+  pvalues[i] =  (anova(m0,m1))$`Pr(>F)`[2]
+}
+
+# Manhattan plots
+plot(1:k, -log10(pvalues))
+# 5% significance line
+abline(h = -log10(0.05))
+# Multiple comparison significance line
+abline(h = -log10(1-(1-0.05)^(1/k)))
+
+# Which SNP are associated using 0.05 significance level
+snpNaiv = which(pvalues <= 0.05, arr.ind=TRUE, useNames = FALSE)
+colnames(genotypeData)[snpNaiv]
+
+# qalues and proportion of true nulls estimations
+qobj = qvalue(pvalues)
+min(qobj$pi0.lambda)
+min(qobj$pi0.smooth)
+
+# False discovery rate estimation
+max(qobj$qvalues[qobj$pvalues <= 0.007])
+snpFDR = which(pvalues <= 0.007, arr.ind=TRUE, useNames = FALSE)
+colnames(genotypeData)[snpFDR]
+```
+
+The estimated proportion of true nulls is 99\%, so they are mostly non-associated SNP. By using a p-value of 0.007, the estimated false discovery rate is controlled to be below 13\%. Only one SNP is significantly associated: 2304186 in akt2 gene.
+
+## Haplotype association test in akt2 gene
+
+```{r}
+# Genotype in gene AKT2
+geno1 = genotypeData[,35:38]
+# Test for HW equilibrium
+hw.test(df2genind(geno1, sep=''))
+# Test for Linkage Disequilibrium
+LDtable(genetics::LD(makeGenotypes(geno1, sep='')),
+          which=c("D", "D'", "r", "X^2","P-value"))
+
+# Haplotype regression
+geno1 = cbind.data.frame(
+  substr(genotypeData$akt2_7254617,1,1), substr(genotypeData$akt2_7254617,2,2),
+  substr(genotypeData$akt2_rs892118,1,1), substr(genotypeData$akt2_rs892118,2,2), 
+  substr(genotypeData$akt2_2304186,1,1), substr(genotypeData$akt2_2304186,2,2), 
+  substr(genotypeData$akt2_969531,1,1), substr(genotypeData$akt2_969531,2,2)
+)
+geno1 = setupGeno(geno1)
+
+haplomodel1a = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+                       allele.lev=attributes(geno1)$unique.alleles, 
+                       control=haplo.glm.control(haplo.effect="additive"))
+aic1a = haplomodel1a$aic
+haplomodel1r = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+                         allele.lev=attributes(geno1)$unique.alleles, 
+                         control=haplo.glm.control(haplo.effect="recessive"))
+aic1r = haplomodel1r$aic
+haplomodel1d = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+                         allele.lev=attributes(geno1)$unique.alleles, 
+                         control=haplo.glm.control(haplo.effect="dominant"))
+aic1d = haplomodel1d$aic
+
+# The recessive model is better according to AIC
+c(aic1a, aic1d, aic1r)
+summary(haplomodel1r)
+qqnorm(haplomodel1r$residuals)
+
+# Conclusion
+# respLog = log(1+r) is the log of the muscle strength growth factor 1+r
+# where r is the muscle strength growth rare after training
+exp(coef(haplomodel1r)[10])
+```
+
+Caucasians with only one copy of haplotype 5 (ATGG, 15.5% of all haplotypes) have, in average, a muscle strength growth factor (after training) that is 16.5\% greater (1.165 times) than that of Caucasians (same age, gender and BMI) with only one copy of base haplotype (CGTG, 43.8\% of all haplotypes). 

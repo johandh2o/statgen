@@ -46,12 +46,11 @@ genotypeData = fullData[,4:226] %>%
                     gdf8_1225t, gdf8_p198a, gdf8_e164k))
 
 # Traits and cofounders
-fullData$respLog = log(1+fullData$NDRM.CH)
-fullData$respAsh = asinh(fullData$NDRM.CH)
+fullData$respLog = log(1+fullData$NDRM.CH/100)
 
 traits = fullData %>% 
   dplyr::select(Gender, Age, Race, Caucasian, pre.BMI,
-                NDRM.CH, respLog, respAsh)
+                NDRM.CH, respLog)
 
 ##################################################
 ## Subpopulation detection
@@ -85,9 +84,14 @@ data.frame(PC1 = PCA$"x"[,1],
 k = ncol(genotypeData)
 pvalues = rep(NA, k)
 for(i in 1:k){
-  tryCatch( { m1 = lm(NDRM.CH ~ genotypeData[,i]+ Caucasian + Age + Gender + pre.BMI, data=fullData) },
-            error = function(e) {m1 = lm(NDRM.CH ~ genotypeData[,i] + Age + Gender + pre.BMI, data=fullData)})
+  # Model 1
+  tryCatch( { m1 = lm(respLog ~ genotypeData[,i]+ Caucasian + Age + Gender + pre.BMI,
+                      data=fullData) },
+            error = function(e) {m1 = lm(respLog ~ genotypeData[,i] + Age + Gender + pre.BMI,
+                                         data=fullData)})
+  # Model 0
   m0 = updated(m1, .~.-genotypeData[,i])
+  # p-values from ANOVA test
   pvalues[i] =  (anova(m1,m0))$`Pr(>F)`[2]
 }
 
@@ -110,18 +114,21 @@ min(qobj$pi0.lambda)
 min(qobj$pi0.smooth)
 
 # False discovery rate estimation
-max(qobj$qvalues[qobj$pvalues <= 0.001])
-snpFDR = which(pvalues <= 0.001, arr.ind=TRUE, useNames = FALSE)
+max(qobj$qvalues[qobj$pvalues <= 0.007])
+snpFDR = which(pvalues <= 0.007, arr.ind=TRUE, useNames = FALSE)
 colnames(genotypeData)[snpFDR]
 
 ##################################################
 ## Haplotypic association 1
 ##################################################
 
-# HW Equilibrium
+# Genotype in gene AKT2
 geno1 = genotypeData[,35:38]
+# Test for HW equilibrium
 hw.test(df2genind(geno1, sep=''))
-genetics::LD(makeGenotypes(geno1, sep=''))
+# Test for Linkage Disequilibrium
+LDtable(genetics::LD(makeGenotypes(geno1, sep='')),
+        which=c("D", "D'", "r", "X^2","P-value"))
 
 # Haplotype regression
 geno1 = cbind.data.frame(
@@ -132,54 +139,20 @@ geno1 = cbind.data.frame(
 )
 geno1 = setupGeno(geno1)
 
-haplomodel1a = haplo.glm(NDRM.CH~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
-                       allele.lev=attributes(geno1)$unique.alleles, 
-                       control=haplo.glm.control(haplo.effect="additive"))
+haplomodel1a = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+                         allele.lev=attributes(geno1)$unique.alleles, 
+                         control=haplo.glm.control(haplo.effect="additive"))
 aic1a = haplomodel1a$aic
-haplomodel1r = haplo.glm(NDRM.CH~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+haplomodel1r = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
                          allele.lev=attributes(geno1)$unique.alleles, 
                          control=haplo.glm.control(haplo.effect="recessive"))
 aic1r = haplomodel1r$aic
-haplomodel1d = haplo.glm(NDRM.CH~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
+haplomodel1d = haplo.glm(respLog~ geno1 * Caucasian + Age + Gender + pre.BMI, data=fullData,
                          allele.lev=attributes(geno1)$unique.alleles, 
                          control=haplo.glm.control(haplo.effect="dominant"))
 aic1d = haplomodel1d$aic
 
-# The recessive model is better
+# The recessive model is better according to AIC
+c(aic1a, aic1d, aic1r)
 summary(haplomodel1r)
-
-##################################################
-## Haplotypic association 2
-##################################################
-
-# HW Equilibrium and LD
-geno2 = genotypeData[,208:213]
-hw.test(df2genind(geno2, sep=''))
-genetics::LD(makeGenotypes(geno2, sep=''))
-
-# Haplotype regression
-geno2 = cbind.data.frame(
-  substr(genotypeData$visfatin_2041681,1,1), substr(genotypeData$visfatin_2041681,2,2),
-  substr(genotypeData$visfatin_6947766,1,1), substr(genotypeData$visfatin_6947766,2,2), 
-  substr(genotypeData$visfatin_3801272,1,1), substr(genotypeData$visfatin_3801272,2,2), 
-  substr(genotypeData$visfatin_10487820,1,1), substr(genotypeData$visfatin_10487820,2,2),
-  substr(genotypeData$visfatin_929604,1,1), substr(genotypeData$visfatin_929604,2,2),
-  substr(genotypeData$visfatin_10953502,1,1), substr(genotypeData$visfatin_10953502,2,2)
-)
-geno2 = setupGeno(geno2)
-
-haplomodel2a = haplo.glm(NDRM.CH~ geno2 + Caucasian + Age + Gender + pre.BMI, data=fullData,
-                         allele.lev=attributes(geno2)$unique.alleles, 
-                         control=haplo.glm.control(haplo.effect="additive"))
-aic2a = haplomodel2a$aic
-haplomodel2r = haplo.glm(NDRM.CH~ geno2 + Caucasian + Age + Gender + pre.BMI, data=fullData,
-                         allele.lev=attributes(geno2)$unique.alleles, 
-                         control=haplo.glm.control(haplo.effect="recessive"))
-aic2r = haplomodel2r$aic
-haplomodel2d = haplo.glm(NDRM.CH~ geno2 + Caucasian + Age + Gender + pre.BMI, data=fullData,
-                         allele.lev=attributes(geno2)$unique.alleles, 
-                         control=haplo.glm.control(haplo.effect="dominant"))
-aic2d = haplomodel2d$aic
-
-# The additive model is better
-summary(haplomodel2a)
+qqnorm(haplomodel1r$residuals)
