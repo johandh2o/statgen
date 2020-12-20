@@ -39,7 +39,6 @@ fullData = read.delim("http://www.biostat.umn.edu/~cavanr/FMS_data.txt",
 
 # Add binary race variable: Caucasian, non-Caucasian
 fullData$Caucasian = ifelse(fullData$Race=='Caucasian', 1, 0)
-fullData$resp = sqrt(fullData$NDRM.CH)
 
 # Genotype data
 genotypeData = fullData[,4:226] %>% 
@@ -49,8 +48,12 @@ genotypeData = fullData[,4:226] %>%
                     gdf8_1225t, gdf8_p198a, gdf8_e164k))
 
 # Traits and cofounders
+fullData$respLog = log(1+fullData$NDRM.CH)
+fullData$respAsh = asinh(fullData$NDRM.CH)
+
 traits = fullData %>% 
-  dplyr::select(Gender, Age, Race, Caucasian, pre.BMI, NDRM.CH)
+  dplyr::select(Gender, Age, Race, Caucasian, pre.BMI,
+                NDRM.CH, respLog, respAsh)
 ```
 
 
